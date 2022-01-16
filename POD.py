@@ -214,9 +214,10 @@ def main():
     DATA_MATRIX = np.vstack(R).T   
 
     del R # Free memory
+	
+    PhiMean = DATA_MATRIX.mean(axis=1)
      
     DATA_MATRIX -= DATA_MATRIX.mean(axis=1,keepdims = True) # np.subtract(DATA_MATRIX,np.matrix().T) # Mean padded 
-    print(DATA_MATRIX.mean(axis=1))
 			       
     #**********************************************************************************
     #**********************************************************************************
@@ -225,6 +226,52 @@ def main():
     #
     #**********************************************************************************
     #**********************************************************************************
+    print("---------------------------------------------------")
+    print("Performing eigendecomposition of covatiance matrix")
+    [U,Sigma,Vh] = np.linalg.svd(DATA_MATRIX, full_matrices=False)
+
+    Lambda = Sig*Sig
+
+    print("---------------------------------------------------")
+    print("Sorting eigenvalues")
+
+    ind = np.argsort(-1*Lambda)
+    Lambda = Lambda[ind]
+    U = U[:,ind]
+    V = Vh[ind,:]
+    V = V.T
+	
+    
+
+# Truncate and plot
+totalEnergy = np.sum(Lambda)
+capturedEnergy = np.zeros(len(Lambda))
+capturedEnergy[0] = Lambda[0]
+
+for i in range(1,len(capturedEnergy)):
+        capturedEnergy[i] = capturedEnergy[i-1]+Lambda[i]
+capturedEnergy /= totalEnergy
+optRank = 0
+for c in capturedEnergy:
+        if( (c*100/totalEnergy) > 99 ):
+                print("Rank = {} approximates 99% of variance".format(optRank))
+                break
+        else:
+                optRank+=1
+
+if(optRank < r):
+        print("User given rank of {} is higher than optimal, truncating to optimal".format(r))
+        r = optRank
+
+
+Phi = Phi[:,0:r]
+
+Rank = np.linspace(1,r,r)
+
+
+    
+
+
     print('DATA_MATRIX.shape = ',DATA_MATRIX.shape)
     SD_LIST = [] # List containing spectral density marices
     for i in range(0,N_BLOCKS):
