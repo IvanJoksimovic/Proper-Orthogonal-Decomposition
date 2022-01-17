@@ -88,7 +88,6 @@ def main():
     
     ap.add_argument("-t0", "--timeStart", required=False,help="Time from which to start")
     ap.add_argument("-t1", "--timeFinish", required=False,help="Time with which to finish")
-    ap.add_argument("-n", "--NBLOCKS", required=False,help="Number of blocks to for Welch transformation")
     
     args = vars(ap.parse_args())
     
@@ -156,12 +155,7 @@ def main():
     if(TEND > timeFiles[-1]):
         TEND =  timeFiles[-1]
     
-    N_FFT = round(math.floor(2*len(timeFiles)/(N_BLOCKS+1)))
-    
-    N = min(len(timeFiles),round(0.5*N_FFT*(N_BLOCKS+1)))
-
-    timeFiles = timeFiles[0:N]
-    timeFilesStr = timeFilesStr[0:N]
+    N = len(timeFiles)
     
     TIME = timeFiles
     timePaths = [os.path.join(directory,str(t),name) for t in timeFilesStr]
@@ -175,19 +169,16 @@ def main():
     freq = freq[0:len(freq)//2]
     fs = 1.0/dt
     
-    print("SPECTRAL POD data:")
+    print("POD data:")
     print("------------------------------------------------------------------")
 
     print("   Start time                     = {} s".format(TIME[0]))
     print("   End time                       = {} s".format(TIME[-1]))
     print("   Number of samples              = {} ".format(N))
-    print("   Number of blocks               = {} ".format(N_BLOCKS))
-    print("   Number of points per block     = {} ".format(N_FFT))
     print("   Min delta t                    = {} s".format(min(dts)))
     print("   Max delta t                    = {} s".format(max(dts)))
     print("   Avg delta t                    = {} s".format(dt))
     print("   Sampling frequency             = {} Hz".format(fs))
-    print("   Nyquist frequency              = {} Hz".format(fs/2.0))
     print("   Frequency resolution           = {} Hz".format(fs/N_FFT)) 
     print("   Input method                   = {}   ".format(DATA_INPUT_METHOD)) 
     print("   Results directory              = {}   ".format(resultsDirectory))
@@ -215,14 +206,14 @@ def main():
 
     del R # Free memory
 	
-    PhiMean = DATA_MATRIX.mean(axis=1)
+    DataMean = DATA_MATRIX.mean(axis=1)
      
     DATA_MATRIX -= DATA_MATRIX.mean(axis=1,keepdims = True) # np.subtract(DATA_MATRIX,np.matrix().T) # Mean padded 
 			       
     #**********************************************************************************
     #**********************************************************************************
     #
-    #    Perform Welch, one frequency at the time
+    #    Calculate SVD Modes
     #
     #**********************************************************************************
     #**********************************************************************************
@@ -240,121 +231,24 @@ def main():
     U = U[:,ind]
     V = Vh[ind,:]
     V = V.T
-	
     
 
-# Truncate and plot
-totalEnergy = np.sum(Lambda)
-capturedEnergy = np.zeros(len(Lambda))
-capturedEnergy[0] = Lambda[0]
-
-for i in range(1,len(capturedEnergy)):
-        capturedEnergy[i] = capturedEnergy[i-1]+Lambda[i]
-capturedEnergy /= totalEnergy
-optRank = 0
-for c in capturedEnergy:
-        if( (c*100/totalEnergy) > 99 ):
-                print("Rank = {} approximates 99% of variance".format(optRank))
-                break
-        else:
-                optRank+=1
-
-if(optRank < r):
-        print("User given rank of {} is higher than optimal, truncating to optimal".format(r))
-        r = optRank
-
-
-Phi = Phi[:,0:r]
-
-Rank = np.linspace(1,r,r)
-
-
-    
-
-
-    print('DATA_MATRIX.shape = ',DATA_MATRIX.shape)
-    SD_LIST = [] # List containing spectral density marices
-    for i in range(0,N_BLOCKS):
-        ind1 = i*N_FFT//2
-        ind2 = (i+2)*N_FFT//2 
-        dd = DATA_MATRIX[:,ind1:ind2]
-        print('Chunk shape = ',dd.shape)
-        CHUNK = list(DATA_MATRIX[:,ind1:ind2])
-        print("Performing FFT on chunk {} of {}".format(i+1,N_BLOCKS))
-        R = []
-        with Executor() as executor:
-            for r in executor.map(FFT,CHUNK):
-                R.append(r)
-        SD_LIST.append(np.vstack(R))
-        
-    del DATA_MATRIX # Free memory 
-                    
-    #**********************************************************************************
-    #**********************************************************************************
-    #
-    #    First calculate singular values and use them to sort modes 
-    #
-    #**********************************************************************************
-    #**********************************************************************************
-    S = [] # List containing sum of all eigenvalues for each mode
-    f = []
-    PHI = []
-
-    print("Calculating singular values for frequencies in range {} : {} ".format(freq[0],freq[-1]))
-
-    for i in range(0,len(freq)):
-        Q = []
-        for SD in SD_LIST:
-            Q.append(SD[:,i])
-        Q = np.vstack(Q).T
-        Sigma = np.linalg.svd(Q,compute_uv=False) # Only compute singular values at this stage, we want to avoid caluclating SVD for every mode there is
-        S.append(np.dot(Sigma,Sigma))
-        f.append(freq[i])
-       
-    #**********************************************************************************
-    #**********************************************************************************
-    #
-    #    Next, perform full SVD for the most energetic 20 modes 
-    #
-    #**********************************************************************************
-    #**********************************************************************************    
-    print("Modes by contained variance:")
-    print("---------------------------------------------------------")
-
-
- 
-
-    indxS = np.argsort(S) # Sorted indexes of S, from largest to smallest
-    indxS = indxS[::-1]
-    iii = 1
-    for ii in indxS[0:20]:
-        Q = []
-        for SD in SD_LIST:
-            Q.append(SD[:,ii])
-        Q = np.vstack(Q).T
-        print("		Calculating mode {} on frequency {}".format(iii,freq[ii]))
-        print('		Matrix dimensions: ',Q.shape)
-	       
-        [U,Sigma,Vh] = np.linalg.svd(Q, full_matrices=False)
- 
-        PHI = np.matrix(U[:,0]) # Save only the most energetic mode at the specific frequency
+    print("---------------------------------------------------")
+    print("Saving results to ",resultsDir)
 	
-        del U
-  
-        fName = "Mode_{}:Frequency_{}".format(iii,f[ii])
-        np.savetxt(os.path.join(resultsDirectory,fName), PHI)
-        print("		Saving the mode {}".format(iii))
-        iii+=1
+    np.savetxt(os.path.join(resultsDirectory,"EigenValues"),Lambda) 
+    np.savetxt(os.path.join(resultsDirectory,"MeanField_SpatialDistribution",DataMean)
+	
+    for i in range(0,20):
+	print("		Saving Mode ",i+1)
+	np.savetxt(os.path.join(resultsDirectory,"Mode_{}_SpatialDistribution".format(i+1),U[:,i])
+ 	np.savetxt(os.path.join(resultsDirectory,"Mode_{}_TimeDynamics".format(i+1),V[:,i])
 
-    SS = np.matrix(S)
-    ff = np.matrix(f) 
-
-    np.savetxt(os.path.join(resultsDirectory,"FrequencyBySingularValues"),np.hstack((ff.T,SS.T)))   
     print("Plotting data")
 
-    plt.plot(f,S)
+    plt.plot(Lambda)
     plt.xlim(0,20)
-    plt.savefig(os.path.join(resultsDirectory,"SpectralEnergy.png"))
+    plt.savefig(os.path.join(resultsDirectory,"ContainedVariance.png"))
     answer = input("All done, write coordinates as well y/n?  ")
     
     if( answer not in ["y","Y","yes","Yes","z","Z"]):
