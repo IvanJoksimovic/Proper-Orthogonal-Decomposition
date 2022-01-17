@@ -237,7 +237,7 @@ def main():
     print("Saving results to ",resultsDir)
 	
     np.savetxt(os.path.join(resultsDirectory,"EigenValues"),Lambda) 
-    np.savetxt(os.path.join(resultsDirectory,"MeanField_SpatialDistribution",DataMean)
+    np.savetxt(os.path.join(resultsDirectory,"MeanField_SpatialDistribution"),DataMean)
 	
     for i in range(0,20):
 	print("		Saving Mode ",i+1)
