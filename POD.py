@@ -30,7 +30,23 @@ def GramSchmidt(mat):
             return
         mat[:, i] *= 1.0 / norm
 
-def redsvd(A, k=10):
+def redsvd(A):
+    
+    Sig = np.linalg.svd(A, full_matrices=False)
+    ind = np.argsort(-1*Sig)
+    Sig = Sig[ind]  
+    
+    totalVariance = np.sum(Sig)
+    accumulatedVariance = 0
+    optRank = 0 
+    for i in range(Sig):
+        accumulatedVariance+=Sig[i]
+        optRank +=1
+        if(accumulatedVariance > 0.99*totalVariance):
+            break
+    print("Optimal rank: ",optRank)
+    k = optRank
+    
     O = np.random.randn(A.shape[0]*k).reshape(A.shape[0], k)
     Y = A.T.dot(O)
     GramSchmidt(Y)
@@ -293,7 +309,7 @@ def main():
     start = time.perf_counter()
     #[U,Sigma,Vh] = np.linalg.svd(DATA_MATRIX, full_matrices=False)
     #[U,Sig,Vh] = svd(DATA_MATRIX, full_matrices=False)
-    [U,Sig,Vh] = redsvd(DATA_MATRIX,k=100)
+    [U,Sig,Vh] = redsvd(DATA_MATRIX)
     #[U,Sig,Vh] = RSVD(DATA_MATRIX)
     finish = time.perf_counter()
     print("Finished in: " + str(finish - start) + "s" )
