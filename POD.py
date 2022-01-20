@@ -32,7 +32,7 @@ def GramSchmidt(mat):
 
 def redsvd(A):
     print("Calculating full spectrum of singular values ")    
-    Sig = np.linalg.svd(A, full_matrices=False)
+    Sig = scipy.linalg.svd(A, full_matrices=True, compute_uv=False)
     ind = np.argsort(-1*Sig)
     Sig = Sig[ind]  
     print("Calculating optimal rank ")     
