@@ -31,11 +31,11 @@ def GramSchmidt(mat):
         mat[:, i] *= 1.0 / norm
 
 def redsvd(A):
-    
+    print("Calculating full spectrum of singular values ")    
     Sig = np.linalg.svd(A, full_matrices=False)
     ind = np.argsort(-1*Sig)
     Sig = Sig[ind]  
-    
+    print("Calculating optimal rank ")     
     totalVariance = np.sum(Sig)
     accumulatedVariance = 0
     optRank = 0 
