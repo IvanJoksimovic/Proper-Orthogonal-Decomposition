@@ -12,9 +12,46 @@ import math
 from scipy.linalg import svd
 from scipy.linalg import norm as slnorm
 from tqdm import tqdm
+from scipy.sparse.linalg import eigsh
 
+def SVD(D):
+    print("SVD :: Creating covariance matrix ")
+    M = np.dot(D.T,D) 
+    print("SVD :: Performing eigendecomposition ")
+    EigVals,EigVecs = eigsh(M,k = M.shape[0]-1,which = "LM")
+    
+    ind = np.argsort(-1*EigVals)
+    EigVals = EigVals[ind] # Sorting from smallest to largest
+    EigVecs = EigVecs[:,ind] # Sorting from smallest to largest
+    print("SVD :: Calculating optimal rank for 0.999% of variance ")
+    
+    SingVals = np.sqrt(EigVals)
+    
+    totalVar = np.sum(SingVals)
+    cumulativeVar = 0
+    k = 0
+    for i in range(0,len(SingVals)):
+        cumulativeVar += SingVals[i]
+        if(cumulativeVar > 0.999*totalVar):
+            break
+        else:
+            k+=1
+    
+    optRank = k   
+    print("SVD :: Optimal rank = ",optRank)    
+    print("SVD :: Calculating U,S,Vh")  
+    S = SingVals[0:optRank]
+    V = EigVecs[:,0:optRank] 
+    invS = 1./S
+    U = np.dot(D,np.dot(V,np.diag(invS)))
+    
+    #DD =np.dot(U,np.dot(np.diag(S),V.T))
+    #np.average(100*(np.abs(DD) - np.abs(D))/np.abs(D))
+    
+    return [U,S,V.T]
+        
 
-DATA_INPUT_METHOD = "foo"
+DATA_INPUT_METHOD = "readOpenFOAMRawFormatVector_ComponentZ"
 
 SVD_EPS = 1e-4
 
@@ -153,7 +190,7 @@ def FFT(row):
 def main():
 
     # Create input arguments:
-
+    
     ap = argparse.ArgumentParser()
 
     ap.add_argument("-d", "--sourceDirectory", required=True,help="String with a path to directory containing time directories")
@@ -169,12 +206,12 @@ def main():
 
     args = vars(ap.parse_args())
 
-    # Parse input arguments
+    #Parse input arguments
+    
 
-
-    directory        = str(args['sourceDirectory'])
-    name             = str(args['sourceFileName'])
-    resultsDirectory = str(args['resultsDirectory'])
+    directory        = str(args['sourceDirectory']) #r"D:\KarmanPimple\postProcessing\planeSample" #
+    name             = str(args['sourceFileName']) #r"vorticity_plane1.raw" #
+    resultsDirectory = str(args['resultsDirectory']) #r"C:\Users\gajev\Desktop\POD\Results"#
 
     if(os.path.exists(resultsDirectory)):
         try:
@@ -288,15 +325,17 @@ def main():
     finish = time.perf_counter()
     
     print("Finished in: " + str(finish - start) + "s" )
-
+    
+    global DATA_MATRIX
     DATA_MATRIX = np.vstack(R).T
 
     del R # Free memory
 
     DataMean = np.matrix(DATA_MATRIX.mean(axis=1)).T
-
+        
     DATA_MATRIX -= DATA_MATRIX.mean(axis=1,keepdims = True) # np.subtract(DATA_MATRIX,np.matrix().T) # Mean padded
-
+    
+    
     #**********************************************************************************
     #**********************************************************************************
     #
@@ -307,38 +346,26 @@ def main():
     print("---------------------------------------------------")
     print("Performing SVD-decomposition of data matrix with shape:",DATA_MATRIX.shape)
     start = time.perf_counter()
-    #[U,Sigma,Vh] = np.linalg.svd(DATA_MATRIX, full_matrices=False)
-    #[U,Sig,Vh] = svd(DATA_MATRIX, full_matrices=False)
-    [U,Sig,Vh] = redsvd(DATA_MATRIX)
-    #[U,Sig,Vh] = RSVD(DATA_MATRIX)
+    [U,Sig,Vh] = SVD(DATA_MATRIX)
     finish = time.perf_counter()
     print("Finished in: " + str(finish - start) + "s" )
-    Lambda = Sig*Sig
-
-    print("---------------------------------------------------")
-    print("Sorting eigenvalues")
-
-    ind = np.argsort(-1*Lambda)
-    Lambda = Lambda[ind]
-    U = U[:,ind]
-    V = Vh[ind,:]
-    V = V.T
-
 
     print("---------------------------------------------------")
     print("Saving results to ",resultsDirectory)
 
-    np.savetxt(os.path.join(resultsDirectory,"EigenValues"),Lambda)
+    np.savetxt(os.path.join(resultsDirectory,"SingularValues"),Sig)
     np.savetxt(os.path.join(resultsDirectory,"MeanField_SpatialDistribution"),DataMean)
 
     for i in range(0,20):
         print("		Saving Mode ",i+1)
         np.savetxt(os.path.join(resultsDirectory,"Mode_{}_SpatialDistribution".format(i+1)),U[:,i])
-        np.savetxt(os.path.join(resultsDirectory,"Mode_{}_TimeDynamics".format(i+1)),V[:,i])
+        np.savetxt(os.path.join(resultsDirectory,"Mode_{}_TimeDynamics".format(i+1)),Vh[:,i])
 
     print("Plotting data")
 
-    plt.bar(np.linspace(1,len(Lambda),len(Lambda)),Lambda)
+    plt.bar(np.linspace(1,len(Sig),len(Sig)),100*Sig/np.sum(Sig))
+    plt.ylabel("Contained variance [%]")
+    plt.xlabel("Mode No.")
     plt.xlim(0,20)
     plt.savefig(os.path.join(resultsDirectory,"ContainedVariance.png"))
  
@@ -353,11 +380,6 @@ def main():
 
     plt.show()
     print("All done!")
-
-
-
-
-
 
 if __name__ == "__main__":
     main()
