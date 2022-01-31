@@ -18,7 +18,9 @@ def SVD(D):
     print("SVD :: Creating covariance matrix ")
     M = np.dot(D.T,D) 
     print("SVD :: Performing eigendecomposition ")
-    EigVals,EigVecs = eigsh(M,k = M.shape[0]-1,which = "LM")
+    #EigVals,EigVecs = eigsh(M,k = M.shape[0]-1,which = "LM")
+    
+    EigVals,EigVecs = eigsh(M,k = min(M.shape[0]-1,500),which = "LM")    
     
     ind = np.argsort(-1*EigVals)
     EigVals = EigVals[ind] # Sorting from smallest to largest
