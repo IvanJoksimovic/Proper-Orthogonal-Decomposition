@@ -50,7 +50,7 @@ def SVD(D):
     #DD =np.dot(U,np.dot(np.diag(S),V.T))
     #np.average(100*(np.abs(DD) - np.abs(D))/np.abs(D))
     
-    return [U,S,V.T]
+    return [U,S]
         
 
 DATA_INPUT_METHOD = "readOpenFOAMRawFormatVector_ComponentZ"
@@ -348,9 +348,11 @@ def main():
     print("---------------------------------------------------")
     print("Performing SVD-decomposition of data matrix with shape:",DATA_MATRIX.shape)
     start = time.perf_counter()
-    [U,Sig,Vh] = SVD(DATA_MATRIX)
+    [U,Sig] = SVD(DATA_MATRIX)
     finish = time.perf_counter()
     print("Finished in: " + str(finish - start) + "s" )
+    print("Calculating time dynamics" )
+    A = np.matmul(U.T,DATA_MATRIX)
 
     print("---------------------------------------------------")
     print("Saving results to ",resultsDirectory)
@@ -361,7 +363,7 @@ def main():
     for i in range(0,20):
         print("		Saving Mode ",i+1)
         np.savetxt(os.path.join(resultsDirectory,"Mode_{}_SpatialDistribution".format(i+1)),U[:,i])
-        np.savetxt(os.path.join(resultsDirectory,"Mode_{}_TimeDynamics".format(i+1)),Vh[:,i])
+        np.savetxt(os.path.join(resultsDirectory,"Mode_{}_TimeDynamics".format(i+1)),A[i,:])
 
     print("Plotting data")
 
@@ -377,8 +379,12 @@ def main():
     Y = np.matrix(getattr(DATA_INPUT_FUNCTIONS,'readSecondColumn')(timePaths[0]))
     Z = np.matrix(getattr(DATA_INPUT_FUNCTIONS,'readThirdColumn')(timePaths[0]))
 
+    print("	Saving XYZ coordinates")
     np.savetxt(os.path.join(resultsDirectory,"XYZ_Coordinates"), np.vstack((X,Y,Z)).T)
-    print("		Saving XYZ coordinates")
+
+    print("             Saving Time")
+    np.savetxt(os.path.join(resultsDirectory,"Time"), TIME)
+    
 
     plt.show()
     print("All done!")
