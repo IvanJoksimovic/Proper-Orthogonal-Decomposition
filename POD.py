@@ -169,6 +169,16 @@ class DATA_INPUT_FUNCTIONS:
 
         #print(path)
         return dataXZ.flatten('F')
+    
+    def readXYVectorComponents(path):
+        data = np.genfromtxt(path,delimiter=None,skip_header=2)
+        data = data[:,-3:]
+        dataXY = np.zeros((data.shape[0],2))
+        dataXY[:,0] = data[:,0]
+        dataXY[:,1] = data[:,1]
+
+        #print(path)
+        return dataXY.flatten('F')
 
 def dataInput(path):
     return getattr(DATA_INPUT_FUNCTIONS, DATA_INPUT_METHOD)(path)
