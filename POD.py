@@ -9,107 +9,15 @@ import sys
 import shutil
 import argparse
 import math
-from scipy.linalg import svd
+from numpy.linalg import svd,qr
 from scipy.linalg import norm as slnorm
 from tqdm import tqdm
 from scipy.sparse.linalg import eigsh
-
-def SVD(D):
-    print("SVD :: Creating covariance matrix ")
-    M = np.dot(D.T,D) 
-    print("SVD :: Performing eigendecomposition ")
-    #EigVals,EigVecs = eigsh(M,k = M.shape[0]-1,which = "LM")
-    
-    EigVals,EigVecs = eigsh(M,k = min(M.shape[0]-1,500),which = "LM")    
-    
-    ind = np.argsort(-1*EigVals)
-    EigVals = EigVals[ind] # Sorting from smallest to largest
-    EigVecs = EigVecs[:,ind] # Sorting from smallest to largest
-    print("SVD :: Calculating optimal rank for 0.999% of variance ")
-    
-    SingVals = np.sqrt(EigVals)
-    
-    totalVar = np.sum(SingVals)
-    cumulativeVar = 0
-    k = 0
-    for i in range(0,len(SingVals)):
-        cumulativeVar += SingVals[i]
-        if(cumulativeVar > 0.999*totalVar):
-            break
-        else:
-            k+=1
-    
-    optRank = k   
-    print("SVD :: Optimal rank = ",optRank)    
-    print("SVD :: Calculating U,S,Vh")  
-    S = SingVals[0:optRank]
-    V = EigVecs[:,0:optRank] 
-    invS = 1./S
-    U = np.dot(D,np.dot(V,np.diag(invS)))
-    
-    #DD =np.dot(U,np.dot(np.diag(S),V.T))
-    #np.average(100*(np.abs(DD) - np.abs(D))/np.abs(D))
-    
-    return [U,S]
         
 
 DATA_INPUT_METHOD = "readOpenFOAMRawFormatVector_ComponentZ"
 
-SVD_EPS = 1e-4
-
-def GramSchmidt(mat):
-    for i in range(mat.shape[1]):
-        for j in range(i):
-            r = np.dot(mat[:, i], mat[:, j]);
-            mat[:, i] -= r * mat[:, j];
-        norm = np.linalg.norm(mat[:, i])
-        if norm < SVD_EPS:
-            for k in range(i, mat.shape[1]):
-                mat[:, k] = 0.0
-            return
-        mat[:, i] *= 1.0 / norm
-
-def redsvd(A):
-    print("Calculating full spectrum of singular values ")    
-    Sig = scipy.linalg.svd(A, full_matrices=True, compute_uv=False)
-    ind = np.argsort(-1*Sig)
-    Sig = Sig[ind]  
-    print("Calculating optimal rank ")     
-    totalVariance = np.sum(Sig)
-    accumulatedVariance = 0
-    optRank = 0 
-    for i in range(Sig):
-        accumulatedVariance+=Sig[i]
-        optRank +=1
-        if(accumulatedVariance > 0.99*totalVariance):
-            break
-    print("Optimal rank: ",optRank)
-    k = optRank
-    
-    O = np.random.randn(A.shape[0]*k).reshape(A.shape[0], k)
-    Y = A.T.dot(O)
-    GramSchmidt(Y)
-    B = A.dot(Y)
-
-    P = np.random.randn(k*k).reshape(k, k)
-    Z = np.dot(B, P)
-    #print("Shape of the matrix Z: ",Z.shape)
-    print("Performing Gram-Schmidt for the matrix shape: ",Z.shape)
-    GramSchmidt(Z)
-    C = np.dot(Z.T, B) # Z is actually Q in standard notation
-    #print("Shape of the matrix C: ",C.shape)
-    Uhat, S, Vhat = np.linalg.svd(C)
-    #print("Shape of the matrix Uhat: ",Uhat.shape)
-    U = np.dot(Z,Uhat)
-    #print("Shape of the matrix U: ",U.shape)
-    invSigma = np.diag(1./S)
-    #print("Shape of the matrix invSigma: ",invSigma.shape)
-    Vh = invSigma.dot(U.T.dot(A))
-    #print("Shape of the matrix Vh: ",Vh.shape)
-    return [U,S,Vh]
-
-
-    
+SVD_EPS = 1e-4    
 
 
 class DATA_INPUT_FUNCTIONS:
@@ -183,20 +91,6 @@ class DATA_INPUT_FUNCTIONS:
 def dataInput(path):
     return getattr(DATA_INPUT_FUNCTIONS, DATA_INPUT_METHOD)(path)
 
-
-
-def FFT(row):
-    # Creating a Hanning window
-    N = len(row)
-    j = np.linspace(0,N-1,N)
-    #w = 0.5 - 0.5*np.cos(2*np.pi*j/(N-1)) # Hamming window
-    aw = 1.0 #- correction factor
-
-    #yf = np.abs(fft(np.multiply(row,w)))
-    yf = np.abs(fft(row))
-    yf[1:N//2] *=2 # Scaling everythig between 0 and Nyquist
-
-    return (aw/N) * yf[0:N//2]
 
 
 def main():
@@ -358,7 +252,11 @@ def main():
     print("---------------------------------------------------")
     print("Performing SVD-decomposition of data matrix with shape:",DATA_MATRIX.shape)
     start = time.perf_counter()
-    [U,Sig] = SVD(DATA_MATRIX)
+    
+    Q,R = qr(A)
+    Ur,Sig,Vh = svd(R,full_matrices=False)
+    U = np.dot(Q,Ur)
+    
     finish = time.perf_counter()
     print("Finished in: " + str(finish - start) + "s" )
     print("Calculating time dynamics" )
